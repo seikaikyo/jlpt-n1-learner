@@ -14,7 +14,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const { messages, isLoading, error, sendMessage, setMode } = useChat()
-const { speak, isPlayingMessage, speechRate } = useSpeech()
+const { speakSegments, isPlayingMessage, speechRate } = useSpeech()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -130,14 +130,14 @@ function getOptions(message: Message): string[] | null {
           <div class="message-bubble">
             <div class="message-text" v-html="formatContent(message.content)"></div>
             <Button
-              v-if="message.role === 'assistant'"
+              v-if="message.role === 'assistant' && message.ttsSegments && message.ttsSegments.length > 0"
               :icon="isPlayingMessage(message.id) ? 'pi pi-stop' : 'pi pi-volume-up'"
               severity="secondary"
               text
               rounded
               size="small"
               class="speak-btn"
-              @click="speak(message.content, message.id)"
+              @click="speakSegments(message.ttsSegments, message.id)"
               v-tooltip.top="isPlayingMessage(message.id) ? '停止' : '朗讀'"
             />
           </div>

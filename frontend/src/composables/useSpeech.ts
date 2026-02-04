@@ -1,99 +1,87 @@
 import { ref, onUnmounted } from 'vue'
+import type { TTSSegment } from './useChat'
 
 const isSpeaking = ref(false)
 const currentMessageId = ref<string | null>(null)
-const speechRate = ref(0.9) // 預設語速
+const speechRate = ref(0.9)
 
 let utteranceQueue: SpeechSynthesisUtterance[] = []
 
-// 判斷字符是否為假名
-function isKana(char: string): boolean {
-  const code = char.charCodeAt(0)
-  // 平假名: 3040-309F, 片假名: 30A0-30FF, 長音符: 30FC
-  return (code >= 0x3040 && code <= 0x309F) ||
-         (code >= 0x30A0 && code <= 0x30FF)
-}
-
 // 取得日文女聲
-function getJapaneseVoice(): SpeechSynthesisVoice | null {
+function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices()
+  // macOS: Kyoko, O-Ren / iOS: Kyoko / Google: ja-JP Female
   const femaleVoice = voices.find(v =>
     v.lang.startsWith('ja') &&
-    (v.name.includes('Kyoko') || v.name.includes('Haruka') || v.name.includes('Female') || v.name.includes('Google'))
+    (v.name.includes('Kyoko') || v.name.includes('O-Ren') || v.name.includes('Haruka') ||
+     v.name.includes('Female') || (v.name.includes('Google') && !v.name.includes('Male')))
   )
   return femaleVoice || voices.find(v => v.lang.startsWith('ja')) || null
 }
 
+// 取得日文男聲
+function getJapaneseMaleVoice(): SpeechSynthesisVoice | null {
+  const voices = speechSynthesis.getVoices()
+  // macOS: Otoya, Hattori / Google: ja-JP Male
+  const maleVoice = voices.find(v =>
+    v.lang.startsWith('ja') &&
+    (v.name.includes('Otoya') || v.name.includes('Hattori') ||
+     v.name.includes('Male') || v.name.includes('男'))
+  )
+  // 如果找不到男聲，用女聲但調低音調
+  return maleVoice || null
+}
+
 // 取得中文女聲
-function getChineseVoice(): SpeechSynthesisVoice | null {
+function getChineseFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices()
   const twVoice = voices.find(v =>
     (v.lang === 'zh-TW' || v.lang.startsWith('zh-Hant')) &&
-    (v.name.includes('Meijia') || v.name.includes('Female') || v.name.includes('Google'))
+    (v.name.includes('Meijia') || v.name.includes('Female') ||
+     (v.name.includes('Google') && !v.name.includes('Male')))
   )
   if (twVoice) return twVoice
 
   const cnVoice = voices.find(v =>
     v.lang.startsWith('zh') &&
-    (v.name.includes('Tingting') || v.name.includes('Female') || v.name.includes('Google'))
+    (v.name.includes('Tingting') || v.name.includes('Female'))
   )
   return cnVoice || voices.find(v => v.lang.startsWith('zh')) || null
 }
 
-// 清理 markdown 格式
-function cleanMarkdown(text: string): string {
-  return text
-    .replace(/```[\s\S]*?```/g, '')
-    .replace(/\*\*(.*?)\*\*/g, '$1')
-    .replace(/\*(.*?)\*/g, '$1')
-    .replace(/#{1,6}\s/g, '')
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+// 取得中文男聲
+function getChineseMaleVoice(): SpeechSynthesisVoice | null {
+  const voices = speechSynthesis.getVoices()
+  const maleVoice = voices.find(v =>
+    v.lang.startsWith('zh') &&
+    (v.name.includes('Sinji') || v.name.includes('Male') || v.name.includes('男'))
+  )
+  return maleVoice || null
 }
 
-// 只保留中日文字符，其他全部移除
-function removePunctuation(text: string): string {
-  // 只保留：平假名、片假名、漢字、空格
-  return text
-    .replace(/[^\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\u3400-\u4DBF\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+// 建立停頓用的 utterance
+function createPauseUtterance(type: 'short' | 'long' | 'speaker'): SpeechSynthesisUtterance {
+  const pause = new SpeechSynthesisUtterance('　')
+  pause.volume = 0
 
-// 把文字分成日文和中文段落
-// 關鍵：看一段文字裡有沒有假名，有假名就是日文
-function splitByLanguage(text: string): Array<{ text: string; isJapanese: boolean }> {
-  const segments: Array<{ text: string; isJapanese: boolean }> = []
-
-  // 按換行和句號分割
-  const sentences = text.split(/[\n。]+/).filter(s => s.trim())
-
-  for (const sentence of sentences) {
-    const trimmed = sentence.trim()
-    if (!trimmed) continue
-
-    // 檢查這個句子有沒有假名
-    let hasKana = false
-    for (const char of trimmed) {
-      if (isKana(char)) {
-        hasKana = true
-        break
-      }
-    }
-
-    // 有假名 = 日文，沒假名 = 中文
-    const lastSegment = segments[segments.length - 1]
-    if (lastSegment && lastSegment.isJapanese === hasKana) {
-      lastSegment.text += ' ' + trimmed
-    } else {
-      segments.push({ text: trimmed, isJapanese: hasKana })
-    }
+  switch (type) {
+    case 'short':   // 逗號：短換氣
+      pause.rate = 2
+      break
+    case 'long':    // 句號：兩倍時間
+      pause.rate = 1
+      break
+    case 'speaker': // 換人說話：最長
+      pause.rate = 0.5
+      break
   }
 
-  return segments
+  return pause
 }
 
 export function useSpeech() {
-  function speak(text: string, messageId: string) {
+  // 使用後端解析好的 TTS segments 播放
+  function speakSegments(segments: TTSSegment[], messageId: string) {
     if (isSpeaking.value && currentMessageId.value === messageId) {
       stop()
       return
@@ -101,62 +89,93 @@ export function useSpeech() {
 
     stop()
 
-    const cleaned = cleanMarkdown(text)
-    if (!cleaned.trim()) return
+    if (!segments || segments.length === 0) return
 
-    const segments = splitByLanguage(cleaned)
     utteranceQueue = []
-
-    const validSegments: Array<{ text: string; isJapanese: boolean }> = []
+    let isFirst = true
 
     for (const segment of segments) {
-      const segmentText = removePunctuation(segment.text)
-      if (segmentText) {
-        validSegments.push({ text: segmentText, isJapanese: segment.isJapanese })
+      if (!segment.text) continue
+
+      // 如果有 pause_before，先加停頓
+      if (segment.pause_before === 'speaker') {
+        utteranceQueue.push(createPauseUtterance('speaker'))
       }
-    }
 
-    if (validSegments.length === 0) return
-
-    for (let i = 0; i < validSegments.length; i++) {
-      const segment = validSegments[i]!
+      // 建立語音
       const utterance = new SpeechSynthesisUtterance(segment.text)
+      const isMale = segment.voice === 'male'
 
-      if (segment.isJapanese) {
+      if (segment.lang === 'ja') {
         utterance.lang = 'ja-JP'
-        const voice = getJapaneseVoice()
-        if (voice) utterance.voice = voice
+        if (isMale) {
+          const voice = getJapaneseMaleVoice()
+          if (voice) {
+            utterance.voice = voice
+          } else {
+            // 沒有男聲時用女聲但降低音調
+            const femaleVoice = getJapaneseFemaleVoice()
+            if (femaleVoice) utterance.voice = femaleVoice
+            utterance.pitch = 0.7
+          }
+        } else {
+          const voice = getJapaneseFemaleVoice()
+          if (voice) utterance.voice = voice
+        }
       } else {
         utterance.lang = 'zh-TW'
-        const voice = getChineseVoice()
-        if (voice) utterance.voice = voice
+        if (isMale) {
+          const voice = getChineseMaleVoice()
+          if (voice) {
+            utterance.voice = voice
+          } else {
+            const femaleVoice = getChineseFemaleVoice()
+            if (femaleVoice) utterance.voice = femaleVoice
+            utterance.pitch = 0.7
+          }
+        } else {
+          const voice = getChineseFemaleVoice()
+          if (voice) utterance.voice = voice
+        }
       }
 
       utterance.rate = speechRate.value
 
-      if (i === 0) {
+      // 第一個 utterance 設定 onstart
+      if (isFirst) {
         utterance.onstart = () => {
           isSpeaking.value = true
           currentMessageId.value = messageId
         }
-      }
-
-      if (i === validSegments.length - 1) {
-        utterance.onend = () => {
-          isSpeaking.value = false
-          currentMessageId.value = null
-        }
-        utterance.onerror = () => {
-          isSpeaking.value = false
-          currentMessageId.value = null
-        }
+        isFirst = false
       }
 
       utteranceQueue.push(utterance)
+
+      // 根據 pause_after 加入停頓
+      if (segment.pause_after === 'short') {
+        utteranceQueue.push(createPauseUtterance('short'))
+      } else if (segment.pause_after === 'long') {
+        utteranceQueue.push(createPauseUtterance('long'))
+      }
     }
 
-    for (const utterance of utteranceQueue) {
-      speechSynthesis.speak(utterance)
+    // 最後一個設定結束事件
+    if (utteranceQueue.length > 0) {
+      const last = utteranceQueue[utteranceQueue.length - 1]!
+      last.onend = () => {
+        isSpeaking.value = false
+        currentMessageId.value = null
+      }
+      last.onerror = () => {
+        isSpeaking.value = false
+        currentMessageId.value = null
+      }
+    }
+
+    // 播放
+    for (const u of utteranceQueue) {
+      speechSynthesis.speak(u)
     }
   }
 
@@ -179,7 +198,7 @@ export function useSpeech() {
     isSpeaking,
     currentMessageId,
     speechRate,
-    speak,
+    speakSegments,
     stop,
     isPlayingMessage
   }

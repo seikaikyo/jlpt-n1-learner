@@ -1,14 +1,24 @@
 import { ref, computed } from 'vue'
 
+export interface TTSSegment {
+  text: string
+  speaker: string | null
+  lang: 'ja' | 'zh'
+  pause_after: 'none' | 'short' | 'long'
+  pause_before?: 'speaker'
+  voice?: 'female' | 'male'
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
   parsed?: Record<string, unknown>
+  ttsSegments?: TTSSegment[]
   timestamp: Date
 }
 
-const API_BASE = 'http://localhost:8010'
+const API_BASE = 'http://localhost:8002'
 
 export function useChat() {
   const messages = ref<Message[]>([])
@@ -61,6 +71,7 @@ export function useChat() {
         role: 'assistant',
         content: data.response,
         parsed: data.parsed_response,
+        ttsSegments: data.tts_segments || [],
         timestamp: new Date()
       }
       messages.value.push(assistantMessage)

@@ -10,6 +10,7 @@ from ..services.learning_service import (
     save_learning_record,
     get_weak_areas
 )
+from ..services.tts_service import parse_for_tts
 
 router = APIRouter(prefix='/api/chat', tags=['chat'])
 
@@ -20,10 +21,20 @@ class ChatRequest(BaseModel):
     conversation_history: list[dict] = []
 
 
+class TTSSegmentModel(BaseModel):
+    text: str
+    speaker: Optional[str] = None
+    lang: str = 'ja'
+    pause_after: str = 'none'
+    pause_before: Optional[str] = None
+    voice: str = 'female'  # female 或 male
+
+
 class ChatResponse(BaseModel):
     response: str
     parsed_response: Optional[dict] = None
     mode: str
+    tts_segments: list[TTSSegmentModel] = []
 
 
 def parse_json_response(text: str) -> Optional[dict]:
@@ -70,10 +81,14 @@ async def chat(request: ChatRequest):
     # 解析回覆
     parsed = parse_json_response(response_text)
 
+    # 解析 TTS 格式
+    tts_segments = parse_for_tts(response_text, request.mode)
+
     return ChatResponse(
         response=response_text,
         parsed_response=parsed,
-        mode=request.mode
+        mode=request.mode,
+        tts_segments=tts_segments
     )
 
 
