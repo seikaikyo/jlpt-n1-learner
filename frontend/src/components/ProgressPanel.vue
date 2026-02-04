@@ -8,7 +8,7 @@ const modeLabels: Record<string, string> = {
   grammar: '文法',
   reading: '讀解',
   vocabulary: '語彙',
-  conversation: '會話'
+  conversation: '聽解'
 }
 </script>
 

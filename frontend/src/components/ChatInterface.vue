@@ -57,9 +57,9 @@ function getStartPrompt(): string {
     case 'grammar':
       return '請開始文法練習，出一題 N1 文法選擇題。'
     case 'reading':
-      return '請開始讀解練習，生成一篇 N1 程度的短文。'
+      return '請開始讀解練習，給我一篇文章和選擇題。'
     case 'conversation':
-      return '你好！請用日文和我聊天。'
+      return '請開始聽解練習，給我一題聽力選擇題。'
     default:
       return '開始練習'
   }
@@ -91,7 +91,7 @@ function getOptions(message: Message): string[] | null {
   <div class="chat-interface">
     <div class="chat-header">
       <h2 class="chat-title">
-        {{ mode === 'grammar' ? '文法練習' : mode === 'reading' ? '讀解練習' : '會話練習' }}
+        {{ mode === 'grammar' ? '文法練習' : mode === 'reading' ? '讀解練習' : '聽解練習' }}
       </h2>
       <div class="header-controls">
         <div class="speed-control">
@@ -109,7 +109,7 @@ function getOptions(message: Message): string[] | null {
         <i class="pi pi-comments"></i>
         <p>點擊下方按鈕開始練習</p>
         <Button
-          :label="'開始' + (mode === 'grammar' ? '文法' : mode === 'reading' ? '讀解' : '會話') + '練習'"
+          :label="'開始' + (mode === 'grammar' ? '文法' : mode === 'reading' ? '讀解' : '聽解') + '練習'"
           icon="pi pi-play"
           @click="sendMessage(getStartPrompt())"
           :disabled="isLoading"

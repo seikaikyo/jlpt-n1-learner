@@ -11,7 +11,7 @@ const emit = defineEmits<{
 const modes = [
   { id: 'grammar', label: '文法練習', icon: 'pi-book', description: 'N1 文法點強化' },
   { id: 'reading', label: '讀解練習', icon: 'pi-file', description: '文章理解訓練' },
-  { id: 'conversation', label: '會話練習', icon: 'pi-comments', description: '日文對話實戰' }
+  { id: 'conversation', label: '聽解練習', icon: 'pi-headphones', description: '模擬聽力測驗' }
 ] as const
 </script>
 
