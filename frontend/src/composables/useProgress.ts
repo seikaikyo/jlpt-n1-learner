@@ -7,7 +7,7 @@ export interface ProgressStats {
   weak_grammar_count: number
 }
 
-const API_BASE = 'http://localhost:8010'
+const API_BASE = 'http://localhost:8002'
 
 export function useProgress() {
   const stats = ref<ProgressStats | null>(null)

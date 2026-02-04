@@ -15,7 +15,7 @@ module.exports = {
       name: 'jlpt-n1-backend',
       cwd: '/Users/dash/Documents/github/jlpt-n1-learner/backend',
       script: './venv/bin/uvicorn',
-      args: 'app.main:app --port 8010 --host 127.0.0.1',
+      args: 'app.main:app --port 8002 --host 127.0.0.1',
       interpreter: 'none',
       watch: false,
       autorestart: false
