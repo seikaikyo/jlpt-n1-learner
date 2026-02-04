@@ -30,11 +30,28 @@ class TTSSegment:
 
 
 def is_japanese(text: str) -> bool:
-    """檢查文字是否包含假名（判斷為日文）"""
+    """檢查文字是否為日文（聽解模式下預設為日文）"""
     for char in text:
         code = ord(char)
         # 平假名: 3040-309F, 片假名: 30A0-30FF
         if (0x3040 <= code <= 0x309F) or (0x30A0 <= code <= 0x30FF):
+            return True
+    # 純漢字也可能是日文，檢查是否有中文特有字符
+    # 如果沒有明顯中文標記，預設當日文處理
+    return False
+
+
+def is_chinese(text: str) -> bool:
+    """檢查文字是否為中文（有中文標點或常用中文詞）"""
+    # 中文標點
+    chinese_punctuation = '，。！？、；：「」『』【】'
+    for char in text:
+        if char in chinese_punctuation:
+            return True
+    # 常見中文詞（台灣用語）
+    chinese_markers = ['的', '是', '在', '了', '嗎', '呢', '啊', '吧', '喔', '欸', '這', '那', '什麼', '怎麼', '為什麼']
+    for marker in chinese_markers:
+        if marker in text:
             return True
     return False
 
@@ -191,6 +208,14 @@ def parse_dialogue(text: str) -> list[dict]:
     return segments
 
 
+def extract_dialogue_block(text: str) -> str | None:
+    """從 <dialogue> 標籤中提取對話內容"""
+    match = re.search(r'<dialogue>([\s\S]*?)</dialogue>', text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
+
+
 def parse_for_tts(text: str, mode: str = 'grammar') -> list[dict]:
     """
     主要解析函數：將文字轉換成 TTS segments
@@ -198,56 +223,64 @@ def parse_for_tts(text: str, mode: str = 'grammar') -> list[dict]:
     if not text:
         return []
 
+    segments = []
+
+    # 聽解模式：只解析 <dialogue> 標籤內的內容
+    if mode == 'conversation':
+        dialogue_block = extract_dialogue_block(text)
+
+        if dialogue_block:
+            # 只處理對話區塊（純日文）
+            dialogue = parse_dialogue(dialogue_block)
+
+            if len(dialogue) >= 1:
+                # 有對話格式
+                last_speaker = None
+
+                for item in dialogue:
+                    speaker = item['speaker']
+                    content = item['text']
+                    voice = item.get('voice', 'male')
+
+                    # 換人說話時標記
+                    speaker_changed = (speaker != last_speaker and last_speaker is not None)
+
+                    # 按標點分割內容
+                    parts = split_by_punctuation(content)
+
+                    for i, (part_text, pause) in enumerate(parts):
+                        # 清理文字
+                        clean_text = clean_segment_text(part_text)
+                        if not clean_text:
+                            continue
+
+                        # 對話區塊內一律用日文
+                        seg = {
+                            'text': clean_text,
+                            'speaker': speaker,
+                            'lang': 'ja',
+                            'pause_after': pause,
+                            'voice': voice
+                        }
+
+                        # 第一個片段且換人說話，前面加 speaker 停頓
+                        if i == 0 and speaker_changed:
+                            seg['pause_before'] = 'speaker'
+
+                        segments.append(seg)
+
+                    last_speaker = speaker
+
+                return segments
+
+        # 沒有 dialogue 標籤，回傳空（聽解模式不朗讀非對話內容）
+        return []
+
+    # 一般模式：清理後按標點分割
     cleaned = clean_for_tts(text)
     if not cleaned:
         return []
 
-    segments = []
-
-    # 聽解模式：優先解析對話格式
-    if mode == 'conversation':
-        dialogue = parse_dialogue(cleaned)
-
-        if len(dialogue) >= 2:
-            # 有對話格式
-            last_speaker = None
-
-            for item in dialogue:
-                speaker = item['speaker']
-                content = item['text']
-                voice = item.get('voice', 'female')
-
-                # 換人說話時標記
-                speaker_changed = (speaker != last_speaker and last_speaker is not None)
-
-                # 按標點分割內容
-                parts = split_by_punctuation(content)
-
-                for i, (part_text, pause) in enumerate(parts):
-                    # 清理文字
-                    clean_text = clean_segment_text(part_text)
-                    if not clean_text:
-                        continue
-
-                    seg = {
-                        'text': clean_text,
-                        'speaker': speaker,
-                        'lang': 'ja' if is_japanese(part_text) else 'zh',
-                        'pause_after': pause,
-                        'voice': voice
-                    }
-
-                    # 第一個片段且換人說話，前面加 speaker 停頓
-                    if i == 0 and speaker_changed:
-                        seg['pause_before'] = 'speaker'
-
-                    segments.append(seg)
-
-                last_speaker = speaker
-
-            return segments
-
-    # 一般模式：按標點分割
     parts = split_by_punctuation(cleaned)
 
     for part_text, pause in parts:
@@ -256,10 +289,18 @@ def parse_for_tts(text: str, mode: str = 'grammar') -> list[dict]:
         if not clean_text:
             continue
 
+        # 判斷語言：有假名=日文，有中文標記=中文，其他預設日文
+        if is_japanese(part_text):
+            lang = 'ja'
+        elif is_chinese(part_text):
+            lang = 'zh'
+        else:
+            lang = 'ja'  # 純漢字預設日文
+
         segments.append({
             'text': clean_text,
             'speaker': None,
-            'lang': 'ja' if is_japanese(part_text) else 'zh',
+            'lang': lang,
             'pause_after': pause
         })
 

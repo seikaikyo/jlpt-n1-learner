@@ -22,13 +22,19 @@ function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
 // 取得日文男聲
 function getJapaneseMaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices()
-  // macOS: Otoya, Hattori / Google: ja-JP Male
+  // 列出所有日文聲音供 debug
+  const jaVoices = voices.filter(v => v.lang.startsWith('ja'))
+  console.log('Available Japanese voices:', jaVoices.map(v => v.name))
+
+  // macOS 日文男聲: Otoya, Hattori
+  // 注意：有些系統的 voice name 可能不同
   const maleVoice = voices.find(v =>
     v.lang.startsWith('ja') &&
-    (v.name.includes('Otoya') || v.name.includes('Hattori') ||
-     v.name.includes('Male') || v.name.includes('男'))
+    (v.name.includes('Otoya') ||
+     v.name.includes('Hattori') ||
+     v.name.toLowerCase().includes('male') ||
+     v.name.includes('男'))
   )
-  // 如果找不到男聲，用女聲但調低音調
   return maleVoice || null
 }
 
