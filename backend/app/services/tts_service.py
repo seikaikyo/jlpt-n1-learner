@@ -178,9 +178,9 @@ def parse_dialogue(text: str) -> list[dict]:
                 if speaker not in speaker_order:
                     speaker_order.append(speaker)
 
-                # 根據出場順序分配性別（第一個女、第二個男、交替）
+                # 根據出場順序分配性別（第一個男、第二個女、交替）
                 speaker_index = speaker_order.index(speaker)
-                voice = 'female' if speaker_index % 2 == 0 else 'male'
+                voice = 'male' if speaker_index % 2 == 0 else 'female'
 
                 segments.append({
                     'speaker': speaker,
