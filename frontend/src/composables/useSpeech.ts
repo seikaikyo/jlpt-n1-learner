@@ -10,11 +10,11 @@ let utteranceQueue: SpeechSynthesisUtterance[] = []
 // 取得日文女聲
 function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices()
-  // macOS: Kyoko, O-Ren / iOS: Kyoko / Google: ja-JP Female
+  // macOS 新版女聲: Kyoko, Flo, Sandy, Shelley, Grandma
   const femaleVoice = voices.find(v =>
     v.lang.startsWith('ja') &&
-    (v.name.includes('Kyoko') || v.name.includes('O-Ren') || v.name.includes('Haruka') ||
-     v.name.includes('Female') || (v.name.includes('Google') && !v.name.includes('Male')))
+    (v.name.includes('Kyoko') || v.name.includes('Flo') ||
+     v.name.includes('Sandy') || v.name.includes('Shelley'))
   )
   return femaleVoice || voices.find(v => v.lang.startsWith('ja')) || null
 }
@@ -22,18 +22,12 @@ function getJapaneseFemaleVoice(): SpeechSynthesisVoice | null {
 // 取得日文男聲
 function getJapaneseMaleVoice(): SpeechSynthesisVoice | null {
   const voices = speechSynthesis.getVoices()
-  // 列出所有日文聲音供 debug
-  const jaVoices = voices.filter(v => v.lang.startsWith('ja'))
-  console.log('Available Japanese voices:', jaVoices.map(v => v.name))
 
-  // macOS 日文男聲: Otoya, Hattori
-  // 注意：有些系統的 voice name 可能不同
+  // macOS 新版男聲: Eddy, Reed, Rocko, Grandpa
   const maleVoice = voices.find(v =>
     v.lang.startsWith('ja') &&
-    (v.name.includes('Otoya') ||
-     v.name.includes('Hattori') ||
-     v.name.toLowerCase().includes('male') ||
-     v.name.includes('男'))
+    (v.name.includes('Eddy') || v.name.includes('Reed') ||
+     v.name.includes('Rocko') || v.name.includes('Grandpa'))
   )
   return maleVoice || null
 }
