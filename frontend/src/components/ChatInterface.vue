@@ -5,6 +5,7 @@ import { useSpeech } from '../composables/useSpeech'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
 import ProgressSpinner from 'primevue/progressspinner'
+import Slider from 'primevue/slider'
 
 interface Props {
   mode: 'grammar' | 'reading' | 'conversation'
@@ -13,7 +14,7 @@ interface Props {
 const props = defineProps<Props>()
 
 const { messages, isLoading, error, sendMessage, setMode } = useChat()
-const { speak, isPlayingMessage } = useSpeech()
+const { speak, isPlayingMessage, speechRate } = useSpeech()
 
 const inputText = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
@@ -92,7 +93,14 @@ function getOptions(message: Message): string[] | null {
       <h2 class="chat-title">
         {{ mode === 'grammar' ? '文法練習' : mode === 'reading' ? '讀解練習' : '會話練習' }}
       </h2>
-      <span class="mode-badge">N1</span>
+      <div class="header-controls">
+        <div class="speed-control">
+          <i class="pi pi-volume-up"></i>
+          <Slider v-model="speechRate" :min="0.5" :max="1.5" :step="0.1" class="speed-slider" />
+          <span class="speed-value">{{ speechRate.toFixed(1) }}x</span>
+        </div>
+        <span class="mode-badge">N1</span>
+      </div>
     </div>
 
     <div ref="messagesContainer" class="messages-container">
@@ -209,6 +217,30 @@ function getOptions(message: Message): string[] | null {
   font-weight: 600;
   color: var(--text-color);
   margin: 0;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.speed-slider {
+  width: 80px;
+}
+
+.speed-value {
+  min-width: 32px;
+  font-size: 0.75rem;
+  font-weight: 500;
 }
 
 .mode-badge {
