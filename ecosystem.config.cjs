@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'jlpt-n1-frontend',
-      cwd: '/Users/dash/Documents/github/jlpt-n1-learner/frontend',
+      cwd: './frontend',
       script: 'npm',
       args: 'run dev',
       env: {
@@ -13,7 +13,7 @@ module.exports = {
     },
     {
       name: 'jlpt-n1-backend',
-      cwd: '/Users/dash/Documents/github/jlpt-n1-learner/backend',
+      cwd: './backend',
       script: './venv/bin/uvicorn',
       args: 'app.main:app --port 8002 --host 127.0.0.1',
       interpreter: 'none',
