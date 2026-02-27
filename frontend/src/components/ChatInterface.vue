@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue'
-import { useChat, type Message } from '../composables/useChat'
+import { useChat, type Message, type JlptLevel } from '../composables/useChat'
 import { useSpeech } from '../composables/useSpeech'
 import InputText from 'primevue/inputtext'
 import Button from 'primevue/button'
@@ -9,6 +9,7 @@ import Slider from 'primevue/slider'
 
 interface Props {
   mode: 'grammar' | 'reading' | 'conversation'
+  level: JlptLevel
 }
 
 const props = defineProps<Props>()
@@ -53,13 +54,14 @@ async function scrollToBottom() {
 
 // 開始練習的提示訊息
 function getStartPrompt(): string {
+  const lvl = props.level.toUpperCase()
   switch (props.mode) {
     case 'grammar':
-      return '請開始文法練習，出一題 N1 文法選擇題。'
+      return `請開始文法練習，出一題 ${lvl} 文法選擇題。`
     case 'reading':
-      return '請開始讀解練習，給我一篇文章和選擇題。'
+      return `請開始讀解練習，給我一篇 ${lvl} 程度的文章和選擇題。`
     case 'conversation':
-      return '請開始聽解練習，給我一題聽力選擇題。'
+      return `請開始聽解練習，給我一題 ${lvl} 程度的聽力選擇題。`
     default:
       return '開始練習'
   }
@@ -99,7 +101,7 @@ function getOptions(message: Message): string[] | null {
           <Slider v-model="speechRate" :min="0.5" :max="1.5" :step="0.1" class="speed-slider" />
           <span class="speed-value">{{ speechRate.toFixed(1) }}x</span>
         </div>
-        <span class="mode-badge">N1</span>
+        <span class="mode-badge">{{ level.toUpperCase() }}</span>
       </div>
     </div>
 

@@ -1,27 +1,31 @@
 from datetime import datetime
-from sqlmodel import Session, select
+from sqlmodel import Session, select, and_
 from ..models.database import LearningRecord, GrammarMastery, ReadingProgress, engine
 
 
-def get_grammar_mastery_data() -> dict[str, float]:
-    """取得所有文法掌握度"""
+def get_grammar_mastery_data(level: str = 'n1') -> dict[str, float]:
+    """取得指定級別的文法掌握度"""
     with Session(engine) as session:
-        stmt = select(GrammarMastery)
+        stmt = select(GrammarMastery).where(GrammarMastery.level == level)
         results = session.exec(stmt).all()
         return {r.grammar_point: r.mastery_level for r in results}
 
 
-def update_grammar_mastery(grammar_point: str, is_correct: bool) -> float:
+def update_grammar_mastery(grammar_point: str, is_correct: bool, level: str = 'n1') -> float:
     """更新文法掌握度"""
     with Session(engine) as session:
         stmt = select(GrammarMastery).where(
-            GrammarMastery.grammar_point == grammar_point
+            and_(
+                GrammarMastery.grammar_point == grammar_point,
+                GrammarMastery.level == level,
+            )
         )
         mastery = session.exec(stmt).first()
 
         if not mastery:
             mastery = GrammarMastery(
                 grammar_point=grammar_point,
+                level=level,
                 correct_count=1 if is_correct else 0,
                 total_count=1
             )
@@ -32,7 +36,6 @@ def update_grammar_mastery(grammar_point: str, is_correct: bool) -> float:
                 mastery.correct_count += 1
             mastery.last_practiced = datetime.now()
 
-        # 計算掌握度（加權平均，最近的更重要）
         mastery.mastery_level = mastery.correct_count / mastery.total_count
         session.commit()
         session.refresh(mastery)
@@ -45,6 +48,7 @@ def save_learning_record(
     question: str,
     user_answer: str,
     is_correct: bool,
+    level: str = 'n1',
     grammar_point: str = None,
     explanation: str = None
 ) -> LearningRecord:
@@ -52,6 +56,7 @@ def save_learning_record(
     with Session(engine) as session:
         record = LearningRecord(
             mode=mode,
+            level=level,
             question=question,
             user_answer=user_answer,
             is_correct=is_correct,
@@ -62,21 +67,20 @@ def save_learning_record(
         session.commit()
         session.refresh(record)
 
-        # 如果有文法點，同時更新掌握度
         if grammar_point:
-            update_grammar_mastery(grammar_point, is_correct)
+            update_grammar_mastery(grammar_point, is_correct, level=level)
 
         return record
 
 
-def get_learning_stats() -> dict:
-    """取得學習統計"""
+def get_learning_stats(level: str | None = None) -> dict:
+    """取得學習統計（可按級別過濾）"""
     with Session(engine) as session:
-        # 總練習次數
-        total_stmt = select(LearningRecord)
-        total_records = session.exec(total_stmt).all()
+        stmt = select(LearningRecord)
+        if level:
+            stmt = stmt.where(LearningRecord.level == level)
+        total_records = session.exec(stmt).all()
 
-        # 各模式統計
         stats = {
             'total_practices': len(total_records),
             'by_mode': {},
@@ -93,10 +97,11 @@ def get_learning_stats() -> dict:
                 'accuracy': correct / len(mode_records) if mode_records else 0
             }
 
-        # 文法掌握度
         mastery_stmt = select(GrammarMastery).order_by(
             GrammarMastery.mastery_level
         ).limit(10)
+        if level:
+            mastery_stmt = mastery_stmt.where(GrammarMastery.level == level)
         masteries = session.exec(mastery_stmt).all()
         stats['grammar_mastery'] = {
             m.grammar_point: {
@@ -105,14 +110,16 @@ def get_learning_stats() -> dict:
             } for m in masteries
         }
 
-        # 最近紀錄
         recent_stmt = select(LearningRecord).order_by(
             LearningRecord.created_at.desc()
         ).limit(10)
+        if level:
+            recent_stmt = recent_stmt.where(LearningRecord.level == level)
         recent = session.exec(recent_stmt).all()
         stats['recent_records'] = [
             {
                 'mode': r.mode,
+                'level': r.level,
                 'question': r.question[:50] + '...' if len(r.question) > 50 else r.question,
                 'is_correct': r.is_correct,
                 'grammar_point': r.grammar_point,
@@ -123,16 +130,15 @@ def get_learning_stats() -> dict:
         return stats
 
 
-def get_weak_areas() -> list[str]:
+def get_weak_areas(level: str | None = None) -> list[str]:
     """識別弱項領域"""
-    stats = get_learning_stats()
+    stats = get_learning_stats(level=level)
     weak = []
 
     for mode, data in stats['by_mode'].items():
         if data['total'] >= 5 and data['accuracy'] < 0.6:
             weak.append(mode)
 
-    # 加入掌握度低的文法點
     for grammar, data in stats['grammar_mastery'].items():
         if data['level'] < 0.5:
             weak.append(f"文法：{grammar}")

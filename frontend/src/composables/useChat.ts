@@ -1,5 +1,7 @@
 import { ref, computed } from 'vue'
 
+export type JlptLevel = 'n5' | 'n4' | 'n3' | 'n2' | 'n1'
+
 export interface TTSSegment {
   text: string
   speaker: string | null
@@ -23,8 +25,29 @@ const API_BASE = 'http://localhost:8002'
 export function useChat() {
   const messages = ref<Message[]>([])
   const currentMode = ref<'grammar' | 'reading' | 'conversation'>('grammar')
+  const currentLevel = ref<JlptLevel>((localStorage.getItem('jlptLevel') as JlptLevel) || 'n3')
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+
+  // API key 管理
+  const apiEnabled = ref(localStorage.getItem('apiEnabled') === 'true')
+  const apiKey = ref(localStorage.getItem('apiKey') || '')
+
+  function setApiEnabled(value: boolean) {
+    apiEnabled.value = value
+    localStorage.setItem('apiEnabled', String(value))
+  }
+
+  function setApiKey(key: string) {
+    apiKey.value = key
+    localStorage.setItem('apiKey', key)
+  }
+
+  function setLevel(level: JlptLevel) {
+    currentLevel.value = level
+    localStorage.setItem('jlptLevel', level)
+    clearMessages()
+  }
 
   const conversationHistory = computed(() => {
     return messages.value.map(m => ({
@@ -36,7 +59,6 @@ export function useChat() {
   async function sendMessage(content: string) {
     if (!content.trim() || isLoading.value) return
 
-    // 添加用戶訊息
     const userMessage: Message = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -49,11 +71,19 @@ export function useChat() {
     error.value = null
 
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      }
+      if (apiEnabled.value && apiKey.value) {
+        headers['X-Api-Key'] = apiKey.value
+      }
+
       const response = await fetch(`${API_BASE}/api/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           mode: currentMode.value,
+          level: currentLevel.value,
           message: content.trim(),
           conversation_history: conversationHistory.value.slice(0, -1)
         })
@@ -65,7 +95,6 @@ export function useChat() {
 
       const data = await response.json()
 
-      // 添加助手回覆
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -98,6 +127,7 @@ export function useChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mode: currentMode.value,
+          level: currentLevel.value,
           question,
           user_answer: userAnswer,
           is_correct: isCorrect,
@@ -123,8 +153,14 @@ export function useChat() {
   return {
     messages,
     currentMode,
+    currentLevel,
     isLoading,
     error,
+    apiEnabled,
+    apiKey,
+    setApiEnabled,
+    setApiKey,
+    setLevel,
     sendMessage,
     recordAnswer,
     setMode,

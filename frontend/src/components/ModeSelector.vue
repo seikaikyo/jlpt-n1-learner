@@ -1,18 +1,39 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import type { JlptLevel } from '../composables/useChat'
+
 interface Props {
   currentMode: 'grammar' | 'reading' | 'conversation'
+  currentLevel: JlptLevel
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 const emit = defineEmits<{
   (e: 'select', mode: 'grammar' | 'reading' | 'conversation'): void
 }>()
 
-const modes = [
-  { id: 'grammar', label: '文法練習', icon: 'pi-book', description: 'N1 文法點強化' },
-  { id: 'reading', label: '讀解練習', icon: 'pi-file', description: '文章理解訓練' },
-  { id: 'conversation', label: '聽解練習', icon: 'pi-headphones', description: '模擬聽力測驗' }
-] as const
+const levelLabel = computed(() => props.currentLevel.toUpperCase())
+
+const modes = computed(() => [
+  {
+    id: 'grammar' as const,
+    label: '文法練習',
+    icon: 'pi-book',
+    description: `${levelLabel.value} 文法點強化`
+  },
+  {
+    id: 'reading' as const,
+    label: '讀解練習',
+    icon: 'pi-file',
+    description: `${levelLabel.value} 文章理解訓練`
+  },
+  {
+    id: 'conversation' as const,
+    label: '聽解練習',
+    icon: 'pi-headphones',
+    description: `${levelLabel.value} 模擬聽力測驗`
+  }
+])
 </script>
 
 <template>

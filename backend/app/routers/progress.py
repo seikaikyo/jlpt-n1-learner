@@ -1,14 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
+from typing import Optional
 from ..services.learning_service import get_learning_stats, get_weak_areas
 
 router = APIRouter(prefix='/api/progress', tags=['progress'])
 
 
 @router.get('')
-async def get_progress():
-    """取得學習進度"""
-    stats = get_learning_stats()
-    weak_areas = get_weak_areas()
+async def get_progress(level: Optional[str] = Query(None)):
+    """取得學習進度（可按級別過濾）"""
+    stats = get_learning_stats(level=level)
+    weak_areas = get_weak_areas(level=level)
 
     return {
         'success': True,
@@ -20,11 +21,10 @@ async def get_progress():
 
 
 @router.get('/summary')
-async def get_summary():
+async def get_summary(level: Optional[str] = Query(None)):
     """取得簡要統計"""
-    stats = get_learning_stats()
+    stats = get_learning_stats(level=level)
 
-    # 計算總正確率
     total_correct = sum(d['correct'] for d in stats['by_mode'].values())
     total_count = sum(d['total'] for d in stats['by_mode'].values())
 

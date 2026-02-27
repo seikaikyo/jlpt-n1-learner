@@ -1,7 +1,10 @@
+import logging
 from datetime import datetime
 from typing import Optional
-from sqlmodel import Field, SQLModel, create_engine, Session
+from sqlmodel import Field, SQLModel, create_engine, Session, text
 from pathlib import Path
+
+logger = logging.getLogger(__name__)
 
 # 資料庫路徑
 DB_PATH = Path(__file__).parent.parent.parent.parent / 'data' / 'learning.db'
@@ -16,6 +19,7 @@ class LearningRecord(SQLModel, table=True):
 
     id: Optional[int] = Field(default=None, primary_key=True)
     mode: str = Field(index=True)  # grammar, reading, vocabulary, conversation
+    level: str = Field(default='n1', index=True)  # n5, n4, n3, n2, n1
     question: str
     user_answer: str
     is_correct: bool
@@ -29,7 +33,8 @@ class GrammarMastery(SQLModel, table=True):
     __tablename__ = 'grammar_mastery'
 
     id: Optional[int] = Field(default=None, primary_key=True)
-    grammar_point: str = Field(unique=True, index=True)
+    grammar_point: str = Field(index=True)
+    level: str = Field(default='n1', index=True)  # n5, n4, n3, n2, n1
     correct_count: int = Field(default=0)
     total_count: int = Field(default=0)
     mastery_level: float = Field(default=0.0)  # 0.0 ~ 1.0
@@ -48,10 +53,25 @@ class ReadingProgress(SQLModel, table=True):
     last_practiced: datetime = Field(default_factory=datetime.now)
 
 
+def _migrate_add_level_column():
+    """為舊資料庫加入 level 欄位（冪等）"""
+    with Session(engine) as session:
+        for table in ('learning_records', 'grammar_mastery'):
+            try:
+                session.exec(text(f"SELECT level FROM {table} LIMIT 1"))
+            except Exception:
+                logger.info('Migration: 為 %s 加入 level 欄位', table)
+                session.exec(text(
+                    f"ALTER TABLE {table} ADD COLUMN level TEXT NOT NULL DEFAULT 'n1'"
+                ))
+                session.commit()
+
+
 def init_db():
     """初始化資料庫"""
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     SQLModel.metadata.create_all(engine)
+    _migrate_add_level_column()
 
 
 def get_session():
